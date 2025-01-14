@@ -6,7 +6,7 @@ with app.app_context():
     User.query.delete()
 
     print("Seeding started")
-    new_user: User = User(username="Felix", email="felixomosh7@gmail.com")
+    new_user: User = User(username="John", email="john@mail.com")
     new_user.set_username()
     new_user.set_password("1234")
 
