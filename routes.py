@@ -5,13 +5,17 @@ from flask_jwt_extended import (
     jwt_required,
     set_access_cookies,
     unset_jwt_cookies,
-    verify_jwt_in_request,
 )
 from flask_restx import Resource
 from flask import jsonify, make_response, request
 from models import User
-from config import db, api, blacklist
+from config import db, api, blacklist, jwt
 import logging
+
+
+@jwt.token_in_blocklist_loader
+def check_if_token_is_blacklisted(jwt_header, jwt_payload):
+    return jwt_payload["jti"] in blacklist
 
 
 PASSWORD_REGEX = re.compile(
