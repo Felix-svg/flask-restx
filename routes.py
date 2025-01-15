@@ -1,9 +1,16 @@
 import re
-from flask_jwt_extended import create_access_token, set_access_cookies
+from flask_jwt_extended import (
+    create_access_token,
+    get_jwt,
+    jwt_required,
+    set_access_cookies,
+    unset_jwt_cookies,
+    verify_jwt_in_request,
+)
 from flask_restx import Resource
 from flask import jsonify, make_response, request
 from models import User
-from config import db, api, jwt
+from config import db, api, blacklist
 import logging
 
 
@@ -162,15 +169,44 @@ class Login(Resource):
                 return {"error": "Invalid email or password"}, 401
 
             access_token = create_access_token(identity=str(user.id))
-            response = make_response(jsonify({
-                "message": "Login successful",
-                "access_token": access_token,
-                "user": user.to_dict(rules=["-id"]),
-            }))
+            response = make_response(
+                jsonify(
+                    {
+                        "message": "Login successful",
+                        "access_token": access_token,
+                        "user": user.to_dict(rules=["-id"]),
+                    }
+                )
+            )
 
             set_access_cookies(response, access_token)
 
             return response
         except Exception as e:
             logging.error(f"Login error: {e}")
+            return {"error": "Something went wrong. Please try again later."}, 500
+
+
+@api.route("/api/logout")
+class Logout(Resource):
+    @jwt_required()
+    def post(self):
+        try:
+            jwt_data = get_jwt()
+
+            jti = jwt_data.get("jti")
+
+            if not jti:
+                return {"error": "Invalid token, missing jti"}, 422
+
+            blacklist.add(jti)
+
+            response = make_response(
+                jsonify({"message": "Successfully logged out"}), 200
+            )
+            unset_jwt_cookies(response)
+
+            return response
+        except Exception as e:
+            logging.error(f"Logout error: {e}")
             return {"error": "Something went wrong. Please try again later."}, 500
