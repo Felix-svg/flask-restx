@@ -214,3 +214,14 @@ class Logout(Resource):
         except Exception as e:
             logging.error(f"Logout error: {e}")
             return {"error": "Something went wrong. Please try again later."}, 500
+
+
+@api.route("/api/protected")
+class Protected(Resource):
+    @jwt_required()
+    def get(self):
+        try:
+            return {"message": "Protected route"}, 200
+        except Exception as e:
+            logging.error(f"Logout error: {e}")
+            return {"error": "Something went wrong. Please try again later."}, 500
