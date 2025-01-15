@@ -14,6 +14,9 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = "FGHHS3FSGT337I3SKSYUI3O"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 app.config["JWT_BLACKLIST_ENABLED"] = True
+app.config["JWT_COOKIE_SECURE"] = True
+app.config["JWT_COOKIE_SAMESITE"] = "Lax"
+app.config["JWT_COOKIE_HTTPONLY"] = True
 
 app.json.compact = False
 
