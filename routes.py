@@ -1,8 +1,9 @@
 import re
+from flask_jwt_extended import create_access_token, set_access_cookies
 from flask_restx import Resource
-from flask import request
+from flask import jsonify, make_response, request
 from models import User
-from config import db, api
+from config import db, api, jwt
 import logging
 
 
@@ -137,4 +138,39 @@ class UserByID(Resource):
             return {"message": "User deleted successfully"}, 200
         except Exception as e:
             logging.error(f"Error deleting user: {e}")
+            return {"error": "Something went wrong. Please try again later."}, 500
+
+
+@api.route("/api/login")
+class Login(Resource):
+    def post(self):
+        try:
+            data = request.get_json()
+
+            if not data:
+                return {"error": "No user data provided"}, 400
+
+            email = data.get("email")
+            password = data.get("password")
+
+            if not email or not password:
+                return {"error": "Missing required fields"}, 400
+
+            user = User.query.filter(User.email == email).first()
+
+            if not user or not user.check_password(password):
+                return {"error": "Invalid email or password"}, 401
+
+            access_token = create_access_token(identity=str(user.id))
+            response = make_response(jsonify({
+                "message": "Login successful",
+                "access_token": access_token,
+                "user": user.to_dict(rules=["-id"]),
+            }))
+
+            set_access_cookies(response, access_token)
+
+            return response
+        except Exception as e:
+            logging.error(f"Login error: {e}")
             return {"error": "Something went wrong. Please try again later."}, 500
