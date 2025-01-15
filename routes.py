@@ -161,13 +161,17 @@ class Login(Resource):
             if not data:
                 return {"error": "No user data provided"}, 400
 
-            email = data.get("email")
+            # email = data.get("email")
+            credential = data.get("credential") # email or username
             password = data.get("password")
 
-            if not email or not password:
+            # if not email or not password:
+            #     return {"error": "Missing required fields"}, 400
+            if not credential or not password:
                 return {"error": "Missing required fields"}, 400
 
-            user = User.query.filter(User.email == email).first()
+            # user = User.query.filter(User.email == email).first()
+            user = User.query.filter((User.email == credential) | (User.username == credential)).first()
 
             if not user or not user.check_password(password):
                 return {"error": "Invalid email or password"}, 401
