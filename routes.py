@@ -1,7 +1,17 @@
+import re
 from flask_restx import Resource
 from flask import request
 from models import User
 from config import db, api
+
+
+PASSWORD_REGEX = re.compile(
+    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
+)
+
+
+def is_strong_password(password):
+    return re.match(PASSWORD_REGEX, password) is not None
 
 
 @api.route("/index")
@@ -33,7 +43,23 @@ class Users(Resource):
             if not username or not email or not password:
                 return {"error": "Missing required fields"}, 400
 
-            new_user: User = User(username=username, email=email)
+            username_exists = User.query.filter(User.username == username).first()
+            if username_exists is not None:
+                return {"message": "Username already taken"}, 409
+
+            email_exists = User.query.filter(User.email == email).first()
+            if email_exists is not None:
+                return {"message": "Email already taken"}, 409
+
+            if not is_strong_password(password):
+                return {
+                    "error": "Password must be at least 8 characters long, "
+                    "contain both uppercase and lowercase letters, "
+                    "include at least one numerical digit, and "
+                    "contain at least one special character"
+                }, 400
+
+            new_user = User(username=username, email=email)
             new_user.set_username()
             new_user.set_password(password)
 
