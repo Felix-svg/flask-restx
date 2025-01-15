@@ -29,7 +29,7 @@ class Users(Resource):
             return users, 200
         except Exception as e:
             logging.error(f"Error fetching users: {e}")
-            return {"error": "Something went wrong. Please try again later. "}, 500
+            return {"error": "Something went wrong. Please try again later."}, 500
 
     def post(self):
         try:
@@ -71,7 +71,7 @@ class Users(Resource):
             return {"message": "User created successfully"}, 201
         except Exception as e:
             logging.error(f"Error creating user: {e}")
-            return {"error": "Something went wrong. Please try again later. "}, 500
+            return {"error": "Something went wrong. Please try again later."}, 500
 
 
 @api.route("/api/users/<int:id>")
@@ -86,7 +86,7 @@ class UserByID(Resource):
             return user.to_dict(), 200
         except Exception as e:
             logging.error(f"Error fetching user: {e}")
-            return {"error": "Something went wrong. Please try again later. "}, 500
+            return {"error": "Something went wrong. Please try again later."}, 500
 
     def patch(self, id):
         try:
@@ -122,7 +122,7 @@ class UserByID(Resource):
             return {"message": "User updated successfully"}, 200
         except Exception as e:
             logging.error(f"Error updating user: {e}")
-            return {"error": "Something went wrong. Please try again later. "}, 500
+            return {"error": "Something went wrong. Please try again later."}, 500
 
     def delete(self, id):
         try:
@@ -137,4 +137,4 @@ class UserByID(Resource):
             return {"message": "User deleted successfully"}, 200
         except Exception as e:
             logging.error(f"Error deleting user: {e}")
-            return {"error": "Something went wrong. Please try again later. "}, 500
+            return {"error": "Something went wrong. Please try again later."}, 500
