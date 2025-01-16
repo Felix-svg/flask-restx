@@ -90,10 +90,16 @@ class Users(Resource):
             new_user.set_username()
             new_user.set_password(password)
 
+            new_user.generate_verification_token()
+
             db.session.add(new_user)
             db.session.commit()
 
-            return {"message": "User created successfully"}, 201
+            send_verification_email(new_user)
+
+            return {
+                "message": "User created successfully. Please check your email to verify your account."
+            }, 201
         except Exception as e:
             logging.error(f"Error creating user: {e}")
             return {"error": "Something went wrong. Please try again later."}, 500
@@ -211,8 +217,8 @@ class Login(Resource):
                     db.session.commit()
                 return {"error": "Invalid email or password"}, 401
 
-            # if not user.is_verified:
-            #     return {"message": "Please verify your email before logging in"}, 403
+            if not user.is_verified:
+                return {"message": "Please verify your email before logging in"}, 403
 
             db.session.add(
                 LoginActivity(
@@ -246,7 +252,7 @@ class Login(Resource):
 @api.route("/api/login-history")
 class LoginHistory(Resource):
     @jwt_required()
-    def get():
+    def get(self):
         user_id = get_jwt_identity()
         activities = (
             LoginActivity.query.filter_by(user_id=user_id)
@@ -255,25 +261,39 @@ class LoginHistory(Resource):
             .all()
         )
 
-        return (
-            jsonify(
-                [
-                    {
-                        "ip_address": act.ip_address,
-                        "user_agent": act.user_agent,
-                        "timestamp": act.timestamp,
-                        "successful": act.successful,
-                    }
-                    for act in activities
-                ]
-            ),
-            200,
+
+@api.route("/api/login-history")
+class LoginHistory(Resource):
+    @jwt_required()
+    def get(self):
+        user_id = get_jwt_identity()
+        print(f"User ID: {user_id}")
+
+        activities = (
+            LoginActivity.query.filter_by(user_id=user_id)
+            .order_by(LoginActivity.timestamp.desc())
+            .limit(10)
+            .all()
         )
+
+        result = []
+        for act in activities:
+            result.append(
+                {
+                    "ip_address": act.ip_address,
+                    "user_agent": act.user_agent,
+                    "timestamp": act.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                    "successful": act.successful,
+                }
+            )
+
+        print(f"Result: {result}")
+        return jsonify(result), 200
 
 
 @api.route("/api/verify/<token>")
 class VerifyEmail(Resource):
-    def get(token):
+    def get(self, token):
         user = User.query.filter_by(verification_token=token).first()
         if not user:
             return {"error": "Invalid or expired token"}, 400
@@ -287,7 +307,7 @@ class VerifyEmail(Resource):
 @api.route("/api/logout-other-sessions")
 class LogoutOtherSessions(Resource):
     @jwt_required()
-    def logout_other_sessions():
+    def logout_other_sessions(self):
         user_id = get_jwt_identity()
 
         # Delete all login activities except the latest one
