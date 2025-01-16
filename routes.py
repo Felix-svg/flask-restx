@@ -253,61 +253,53 @@ class Login(Resource):
 class LoginHistory(Resource):
     @jwt_required()
     def get(self):
-        user_id = get_jwt_identity()
-        activities = (
-            LoginActivity.query.filter_by(user_id=user_id)
-            .order_by(LoginActivity.timestamp.desc())
-            .limit(10)
-            .all()
-        )
+        try:
+            user_id = get_jwt_identity()
 
-
-@api.route("/api/login-history")
-class LoginHistory(Resource):
-    @jwt_required()
-    def get(self):
-        user_id = get_jwt_identity()
-        print(f"User ID: {user_id}")
-
-        activities = (
-            LoginActivity.query.filter_by(user_id=user_id)
-            .order_by(LoginActivity.timestamp.desc())
-            .limit(10)
-            .all()
-        )
-
-        result = []
-        for act in activities:
-            result.append(
-                {
-                    "ip_address": act.ip_address,
-                    "user_agent": act.user_agent,
-                    "timestamp": act.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                    "successful": act.successful,
-                }
+            activities = (
+                LoginActivity.query.filter_by(user_id=user_id)
+                .order_by(LoginActivity.timestamp.desc())
+                .limit(10)
+                .all()
             )
 
-        print(f"Result: {result}")
-        return jsonify(result), 200
+            result = []
+            for act in activities:
+                result.append(
+                    {
+                        "ip_address": act.ip_address,
+                        "user_agent": act.user_agent,
+                        "timestamp": act.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                        "successful": act.successful,
+                    }
+                )
+
+            return result, 200
+        except Exception as e:
+            logging.error(f"Error fetching login history: {e}")
+            return {"error": "Something went wrong. Please try again later."}, 500
 
 
 @api.route("/api/verify/<token>")
 class VerifyEmail(Resource):
     def get(self, token):
-        user = User.query.filter_by(verification_token=token).first()
-        if not user:
-            return {"error": "Invalid or expired token"}, 400
+        try:
+            user = User.query.filter_by(verification_token=token).first()
+            if not user:
+                return {"error": "Invalid or expired token"}, 400
 
-        user.is_verified = True
-        user.verification_token = None
-        db.session.commit()
-        return {"message": "Email verified successfully! You can now log in."}
-
+            user.is_verified = True
+            user.verification_token = None
+            db.session.commit()
+            return {"message": "Email verified successfully! You can now log in."}
+        except Exception as e:
+            logging.error(f"Error verifying email: {e}")
+            return {"error": "Something went wrong. Please try again later."}, 500
 
 @api.route("/api/logout-other-sessions")
 class LogoutOtherSessions(Resource):
     @jwt_required()
-    def logout_other_sessions(self):
+    def get(self):
         user_id = get_jwt_identity()
 
         # Delete all login activities except the latest one
@@ -322,7 +314,7 @@ class LogoutOtherSessions(Resource):
             ).delete()
             db.session.commit()
 
-        return jsonify({"message": "Logged out of all other sessions."}), 200
+        return {"message": "Logged out of all other sessions."}, 200
 
 
 @api.route("/api/logout")
