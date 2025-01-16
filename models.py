@@ -1,4 +1,4 @@
-import datetime
+import uuid
 from sqlalchemy_serializer import SerializerMixin
 from config import db, bcrypt
 
@@ -11,6 +11,7 @@ class User(db.Model, SerializerMixin):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String, nullable=False)
     is_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(), default=str(uuid.uuid4()))
 
     login_activities = db.relationship("LoginActivity", back_populates="user")
 
@@ -26,12 +27,15 @@ class User(db.Model, SerializerMixin):
         self.username = f"@{self.username.lower()}"
         return self.username
 
+    def generate_verification_token(self):
+        self.verification_token = str(uuid.uuid4())
 
-class LoginActivity(db.Model,SerializerMixin):
+
+class LoginActivity(db.Model, SerializerMixin):
     __tablename__ = "login_activities"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     ip_address = db.Column(db.String(45), nullable=False)
     user_agent = db.Column(db.String(255), nullable=True)
     timestamp = db.Column(db.DateTime, server_default=db.func.now())

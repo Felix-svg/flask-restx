@@ -8,9 +8,10 @@ from flask_jwt_extended import (
     unset_jwt_cookies,
 )
 from flask_restx import Resource
-from flask import jsonify, make_response, request
+from flask_mail import Message
+from flask import jsonify, make_response, request, url_for
 from models import LoginActivity, User
-from config import db, api, blacklist, jwt
+from config import db, api, blacklist, jwt, mail
 import logging
 
 
@@ -26,6 +27,17 @@ PASSWORD_REGEX = re.compile(
 
 def is_strong_password(password):
     return re.match(PASSWORD_REGEX, password) is not None
+
+
+def send_verification_email(user):
+    token = user.verification_token
+    verification_url = url_for("verify_email", token=token, _external=True)
+
+    msg = Message(
+        "Verify Your Email", sender="noreply@example.com", recipients=[user.email]
+    )
+    msg.body = f"Click the link to verify your email: {verification_url}"
+    mail.send(msg)
 
 
 @api.route("/index")
@@ -218,7 +230,7 @@ class Login(Resource):
                     {
                         "message": "Login successful",
                         "access_token": access_token,
-                        "user": user.to_dict(rules=["-id","-login_activities"]),
+                        "user": user.to_dict(rules=["-id", "-login_activities"]),
                     }
                 )
             )
@@ -257,6 +269,19 @@ class LoginHistory(Resource):
             ),
             200,
         )
+
+
+@api.route("/api/verify/<token>")
+class VerifyEmail(Resource):
+    def get(token):
+        user = User.query.filter_by(verification_token=token).first()
+        if not user:
+            return {"error": "Invalid or expired token"}, 400
+
+        user.is_verified = True
+        user.verification_token = None
+        db.session.commit()
+        return {"message": "Email verified successfully! You can now log in."}
 
 
 @api.route("/api/logout-other-sessions")
