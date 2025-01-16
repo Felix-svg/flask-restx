@@ -2,13 +2,14 @@ import re
 from flask_jwt_extended import (
     create_access_token,
     get_jwt,
+    get_jwt_identity,
     jwt_required,
     set_access_cookies,
     unset_jwt_cookies,
 )
 from flask_restx import Resource
 from flask import jsonify, make_response, request
-from models import User
+from models import LoginActivity, User
 from config import db, api, blacklist, jwt
 import logging
 
@@ -152,6 +153,16 @@ class UserByID(Resource):
             return {"error": "Something went wrong. Please try again later."}, 500
 
 
+def get_client_ip():
+    """Get client IP address"""
+    return request.headers.get("X-Forwarded-For", request.remote_addr)
+
+
+def get_user_agent():
+    """Get user agent string from request headers"""
+    return request.headers.get("User-Agent", "Unknown")
+
+
 @api.route("/api/login")
 class Login(Resource):
     def post(self):
@@ -162,7 +173,7 @@ class Login(Resource):
                 return {"error": "No user data provided"}, 400
 
             # email = data.get("email")
-            credential = data.get("credential") # email or username
+            credential = data.get("credential")  # email or username
             password = data.get("password")
 
             # if not email or not password:
@@ -171,10 +182,35 @@ class Login(Resource):
                 return {"error": "Missing required fields"}, 400
 
             # user = User.query.filter(User.email == email).first()
-            user = User.query.filter((User.email == credential) | (User.username == credential)).first()
+            user = User.query.filter(
+                (User.email == credential) | (User.username == credential)
+            ).first()
 
             if not user or not user.check_password(password):
+                if user:
+                    db.session.add(
+                        LoginActivity(
+                            user_id=user.id,
+                            ip_address=get_client_ip(),
+                            user_agent=get_user_agent(),
+                            successful=False,
+                        )
+                    )
+                    db.session.commit()
                 return {"error": "Invalid email or password"}, 401
+
+            # if not user.is_verified:
+            #     return {"message": "Please verify your email before logging in"}, 403
+
+            db.session.add(
+                LoginActivity(
+                    user_id=user.id,
+                    ip_address=get_client_ip(),
+                    user_agent=get_user_agent(),
+                    successful=True,
+                )
+            )
+            db.session.commit()
 
             access_token = create_access_token(identity=str(user.id))
             response = make_response(
@@ -182,7 +218,7 @@ class Login(Resource):
                     {
                         "message": "Login successful",
                         "access_token": access_token,
-                        "user": user.to_dict(rules=["-id"]),
+                        "user": user.to_dict(rules=["-id","-login_activities"]),
                     }
                 )
             )
@@ -193,6 +229,55 @@ class Login(Resource):
         except Exception as e:
             logging.error(f"Login error: {e}")
             return {"error": "Something went wrong. Please try again later."}, 500
+
+
+@api.route("/api/login-history")
+class LoginHistory(Resource):
+    @jwt_required()
+    def get():
+        user_id = get_jwt_identity()
+        activities = (
+            LoginActivity.query.filter_by(user_id=user_id)
+            .order_by(LoginActivity.timestamp.desc())
+            .limit(10)
+            .all()
+        )
+
+        return (
+            jsonify(
+                [
+                    {
+                        "ip_address": act.ip_address,
+                        "user_agent": act.user_agent,
+                        "timestamp": act.timestamp,
+                        "successful": act.successful,
+                    }
+                    for act in activities
+                ]
+            ),
+            200,
+        )
+
+
+@api.route("/api/logout-other-sessions")
+class LogoutOtherSessions(Resource):
+    @jwt_required()
+    def logout_other_sessions():
+        user_id = get_jwt_identity()
+
+        # Delete all login activities except the latest one
+        latest_activity = (
+            LoginActivity.query.filter_by(user_id=user_id)
+            .order_by(LoginActivity.timestamp.desc())
+            .first()
+        )
+        if latest_activity:
+            LoginActivity.query.filter(
+                LoginActivity.user_id == user_id, LoginActivity.id != latest_activity.id
+            ).delete()
+            db.session.commit()
+
+        return jsonify({"message": "Logged out of all other sessions."}), 200
 
 
 @api.route("/api/logout")
